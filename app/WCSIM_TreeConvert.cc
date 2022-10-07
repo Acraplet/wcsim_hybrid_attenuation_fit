@@ -779,6 +779,7 @@ int main(int argc, char **argv){
         timetof_digi = timetof;
         // if (pmtType==0) BnLDigitizer->Digitize(nPE_digi,timetof_digi);
         // if (pmtType==1) mPMTDigitizer->Digitize(nPE_digi,timetof_digi);
+        //In the WCTE feature we only have mPMTs
         mPMTDigitizer->Digitize(nPE_digi,timetof_digi);
 
         weight = 1;
