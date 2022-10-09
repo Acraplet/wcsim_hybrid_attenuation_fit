@@ -51,12 +51,59 @@ WCSimRootGeom *geo = 0;
 const int nPMTtypes = 2;
 double PMTradius[nPMTtypes];
 
+double CalcSolidThetaP(double r, double R)
+{
+  std::cout << TMath::ATan(sqrt(R*R-r*r)/r) << std::endl;
+  return TMath::ATan(sqrt(R*R-r*r)/r);
+}
+
+double CalcSolidThetaAB(double r, double R, double costh, double coef=1)
+{
+  double tp = CalcSolidThetaP(r,R);
+  if (TMath::Abs(TMath::ACos(costh)+ coef*tp) < TMath::Pi()/2)
+  {
+    std::cout << "ThetaAB = " << TMath::ACos(costh) + coef*tp << " " << tp << " " << coef << std::endl; 
+    return TMath::ACos(costh)+ coef*tp;
+  }
+  else 
+  {
+    return TMath::Pi()/2;
+  }
+}
+
+double CalcSolidY(double r, double R, double costh, double x)
+{
+  double ta = CalcSolidThetaAB(r, R, costh, -1);
+  double tb = CalcSolidThetaAB(r, R, costh, +1);
+  return TMath::Tan(TMath::Abs(ta-tb)/2) / x;
+}
+
+double CalcSolidX(double r, double R, double costh)
+{
+  double ta = CalcSolidThetaAB(r, R, costh, -1);
+  double tb = CalcSolidThetaAB(r, R, costh, +1);
+  double weight = 0.5 * r * sqrt((TMath::Cos(ta)-TMath::Cos(tb)) * (TMath::Cos(ta)-TMath::Cos(tb)) + (TMath::Sin(ta)- TMath::Sin(tb)) * (TMath::Sin(ta)- TMath::Sin(tb)));
+  std::cout << "This is x:" << weight << " ta: " << ta* 180/TMath::Pi() << " tb: "<< tb* 180/TMath::Pi() << " cacb + sasb: "<< TMath::Cos(ta)*TMath::Cos(tb)+TMath::Sin(ta)*TMath::Sin(tb) << std::endl;
+  std::cout << "Sanity check: " << ta+tb-2*TMath::ACos(costh) << " theta: "<< TMath::ACos(costh)* 180/TMath::Pi() << std::endl; 
+  return weight;
+}
+
+double CalcSolidOpeningAngle(double r, double R, double costh, double x)
+{
+  return TMath::ATan(x/(sqrt(R*R-r*r) - CalcSolidY(r, R, costh, x)));
+}
+
+
 double CalcSolidAngle(double r, double R, double costh)
 {
-  double weight = 2*TMath::Pi()*(1-R/sqrt(R*R+r*r));
-  //weight *= 1.-0.5*sqrt(1-costh*costh);
-  //weight *= 0.5+0.5*costh;
 
+  //double weight = 2*TMath::Pi()*(1-R/sqrt(R*R+r*r)); KM's version, just a projection?
+  double x = CalcSolidX(r, R, costh);
+  double tR = CalcSolidOpeningAngle(r,R,costh, x);
+  double weight = 2*TMath::Pi()*x*x*(1-TMath::Cos(tR)) / (R*R);
+  //weight *= 1.-0.5*sqrt(1-costh*costh);
+  std::cout << "SOLID ANGLE: " << weight << " R: "<< R << " COSTH: "<< TMath::ACos(costh) * 180/TMath::Pi()<< std::endl;
+  //weight *= 0.5+0.5*costh;
   return weight;
 }
 
