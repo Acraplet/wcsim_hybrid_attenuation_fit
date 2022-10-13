@@ -104,7 +104,7 @@ double CalcSolidAngle(double r, double R, double costh)
   //weight *= 1.-0.5*sqrt(1-costh*costh);
   std::cout << "SOLID ANGLE: " << weight << " R: "<< R << " COSTH: "<< TMath::ACos(costh) * 180/TMath::Pi()<< std::endl;
   //weight *= 0.5+0.5*costh;
-  return weight;
+  return weight * R*R / (r*r); //last factor is to have the same as what was before
 }
 
 void HelpMessage()
