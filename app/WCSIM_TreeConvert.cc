@@ -95,16 +95,42 @@ double CalcSolidOpeningAngle(double r, double R, double costh, double x)
 
 
 double CalcSolidAngle(double r, double R, double costh)
-{
+{ 
+  //double weight = 2*TMath::Pi()*(1-R/sqrt(R*R+r*r)); HK solid angle approximation
+  //Below is the WCTE exact calculations
+  //The opening angle of the visible PMT surface viewd from the PMT centre for a source at theta = 0
+  double theta_p = TMath::ACos(r/R);
+  //theta_top and theta_bottom are the upper and lower opening angle of the visible PMT still from the 
+  //centre of the PMT w.r.t the PMT normal but this time shifted by theta and camped at +/- pi/2 
+  //because the PMT active region is only an hemisphere (and not a full sphere)  
+  double theta_bottom, theta_top;
+  double theta = TMath::ACos(costh);
+  
+  if ((theta + theta_p) <= TMath::Pi()/2){
+      theta_top = theta + theta_p;
+  }	
+  else{
+      //in principle (theta + theta_p) > 0 all the time
+      theta_top = TMath::Pi()/2;
+  }
 
-  //double weight = 2*TMath::Pi()*(1-R/sqrt(R*R+r*r)); KM's version, just a projection?
-  double x = CalcSolidX(r, R, costh);
-  double tR = CalcSolidOpeningAngle(r,R,costh, x);
-  double weight = 2*TMath::Pi()*x*x*(1-TMath::Cos(tR)) / (R*R);
-  //weight *= 1.-0.5*sqrt(1-costh*costh);
-  std::cout << "SOLID ANGLE: " << weight << " R: "<< R << " COSTH: "<< TMath::ACos(costh) * 180/TMath::Pi()<< std::endl;
-  //weight *= 0.5+0.5*costh;
-  return weight * R*R / (r*r); //last factor is to have the same as what was before
+  if (TMath::Abs(theta - theta_p) <= TMath::Pi()/2){
+      theta_bottom = theta - theta_p;
+  }
+  else{
+      //physically (theta - theta_p) cannot be equal to +pi/2 only -pi/2
+      theta_bottom = -TMath::Pi()/2;
+   }
+  double coef = TMath::Sqrt( (TMath::Cos(theta_top)-TMath::Cos(theta_bottom)) * (TMath::Cos(theta_top)-TMath::Cos(theta_bottom)) + (TMath::Sin(theta_top)-TMath::Sin(theta_bottom)) * (TMath::Sin(theta_top)-TMath::Sin(theta_bottom))); 
+  double x = 0.5 * r * coef; 
+  double theta_d = 4 * (TMath::Sin(theta_bottom) + TMath::Sin(theta_top)) / coef;  
+  double theta_f = TMath::Pi()/2 + theta_p - theta_d - theta_top + theta_bottom;
+  double y = x * TMath::Tan(-theta_f);
+  double theta_R = TMath::ASin(x / (TMath::Sqrt((R - y)*(R - y) + x*x)));
+  //WCTE solid angle calculation - need to divide by r^2 to have the same format as the HK approximation 
+  //(instead of 2pi(1-cos(theta_R)) * r*r / R*R the formula for solid angle)
+  //std::cout << "R = " << R << " theta = " << theta << " x = " << x << " y = " << y << " theta_f = " << theta_f << " theta_R = " << theta_R << std::endl; 
+  return 2*TMath::Pi() * (1 - TMath::Cos(theta_R)) * x * x / (r * r);
 }
 
 void HelpMessage()
