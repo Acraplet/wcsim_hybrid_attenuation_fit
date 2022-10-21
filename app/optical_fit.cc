@@ -37,7 +37,8 @@ int main(int argc, char** argv)
     int num_threads = 1;
     int seed = 0;
     int toys = 0;
-
+//acraplet mode to change to look at timing instead
+    int mode = 0; 
     char option;
     while((option = getopt(argc, argv, "j:f:o:c:n:s:t:h")) != -1)
     {
@@ -262,7 +263,7 @@ int main(int argc, char** argv)
             }
         }
 
-        s->LoadEventsFromFile(filename,ev_tree_name,pmt_treename);
+        s->LoadEventsFromFile(filename,ev_tree_name,pmt_treename, mode);
         s->InitEventMap();
         samples.push_back(s);
     }
@@ -314,7 +315,7 @@ int main(int argc, char** argv)
                 fixeds.push_back(fixeds[lastidx]);
             }
         }
-        for (int i=0;i<npar;i++)
+	for (int i=0;i<npar;i++)
             std::cout << TAG<<parnames[i]<<" "<<priors[i]<<" "<<steps[i]<<" "<<lows[i]<<" "<<highs[i]<<" "<<fixeds[i]<<" "<<std::endl;
 
         auto binning = toml_h::find<toml::array>(ele,4);
@@ -476,4 +477,79 @@ int main(int argc, char** argv)
         }
     }
     return 0;
-}    
+}   
+
+//The global variables
+std::vector<double> fitting_x;
+std::vector<int> fitting_y;
+int m_calls;
+
+
+int TimingCalibration(std::string filename, std::string ev_tree_name, std::string pmt_treename, int mode, AnaSample *s){ 
+  //WE need to read the information of obtain them - the timetof is what we need 
+  //TFile oldFile(filename.c_str(), "READ");
+  //TTree *tree = static_cast<TTree*>(oldFile.Get(ev_tree_name.c_str()));
+  //need to extract the geometry and hit information - ideally we want to read the file only once dig
+  //into load event from file 
+  //DOING it here so far but then will move all of this in LoadEvents forFile
+  
+  s->LoadEventsFromFile(filename,ev_tree_name,pmt_treename, mode);
+
+
+
+  //Defining the map that will be used, always in terms of the PMT_ID value
+  std::map<int, std::vector<double>> SmearedTime_map;
+  std::map<int, double> SmearingTime_map, calibration_mean_map;
+  //Split the tree entries into the correct map entry
+  for (int i=0;i<tree->GetEntries();i++){
+    tree->GetEntry(i);
+    if (SmearedTime_map.count(PMT_ID)>0) {
+      //The key already exists, we just need to append the reading
+      SmearedTime_map[PMT_ID].push_back(smearedTime);
+    }
+    else {
+      //the key needs to be added to the SmeareadTimemap and the time appended
+      std::vector<double> a={smearedTime};
+      SmearedTime_map.insert(std::pair<int, std::vector<double>>(PMT_ID, a));
+      //for values constant with
+      mearingTime_map.insert(std::pair<int, double>(PMT_ID, smearingTime));
+      calibration_mean_map.insert(std::pair<int, double>(PMT_ID, calibration_mean));
+    }
+  }
+  //Now for each pmt I have a list of smeared time
+  //  //I want to put them in histogram format to fit - create a map with the x-y pair
+  std::map<int, std::pair<std::vector<double>, std::vector<int>>> histogram_map;
+  std::map<int, std::vector<double>> chi2_cali_map, LL_cali_map;
+  std::map<int, std::vector<double>>::iterator it = SmearedTime_map.begin();
+
+  for (it=SmearedTime_map.begin(); it!=SmearedTime_map.end(); ++it) {
+    int ID = it->first;
+    //to save space, no need to save them...
+    histogram_map[ID] = vector_to_hist_xy(SmearedTime_map[ID]);
+
+    ::fitting_x = histogram_map[ID].first;
+    ::fitting_y = histogram_map[ID].second;
+    //initialise and run the minimiser with the LL likelihood
+    const char* nameLL = "LL";
+    auto m_fitterLL = InitialiseMinimiser(nameLL);
+    m_fitterLL->Minimize();
+    const double *xsLL = m_fitterLL->X();
+    const double *errorLL =m_fitterLL->Errors();
+
+    //for now only save the chi2 values
+    std::vector<double> vect, vectLL;
+
+    //Amplitude value & error
+    vectLL.push_back(xsLL[0]);
+    vectLL.push_back(errorLL[0]);
+    //mean value & error
+    vectLL.push_back(xsLL[1]);
+    vectLL.push_back(errorLL[1]);
+    //std value & error
+    vectLL.push_back(xsLL[2]);
+    vectLL.push_back(errorLL[2]);
+
+    LL_cali_map[ID] = vect;   
+    std::cout << "Done we'll see what it did" << std::endl;
+
+}

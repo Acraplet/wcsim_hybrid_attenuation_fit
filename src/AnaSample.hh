@@ -42,9 +42,9 @@ public:
 
     AnaEvent* GetPMT(const unsigned int evnum);
 
-    void LoadEventsFromFile(const std::string& file_name, const std::string& tree_name, const std::string& pmt_tree_name);
-    void LoadPMTDataEntries();
-    void LoadPMTDataHist();
+    void LoadEventsFromFile(const std::string& file_name, const std::string& tree_name, const std::string& pmt_tree_name, int mode = 0);
+    void LoadPMTDataEntries(int mode = 0);
+    void LoadPMTDataHist(int mode = 0);
     void ResetPMTDataHist();
     inline void SetDataHistName(const std::string& val) { m_data_hist_name = val; }
 

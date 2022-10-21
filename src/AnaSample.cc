@@ -92,7 +92,7 @@ AnaSample::~AnaSample()
 
 }
 
-void AnaSample::LoadEventsFromFile(const std::string& file_name, const std::string& tree_name, const std::string& pmt_tree_name)
+void AnaSample::LoadEventsFromFile(const std::string& file_name, const std::string& tree_name, const std::string& pmt_tree_name, int mode)
 {
     selTree = new AnaTree(file_name, tree_name, pmt_tree_name);
     //acraplet
@@ -133,8 +133,8 @@ void AnaSample::LoadEventsFromFile(const std::string& file_name, const std::stri
 
     ResetPMTDataHist();
 
-    if (selTree->UseDataHist()) LoadPMTDataHist();
-    else LoadPMTDataEntries();
+    if (selTree->UseDataHist()) LoadPMTDataHist(mode);
+    else LoadPMTDataEntries(mode);
 
     PrintStats();
 }
@@ -202,7 +202,7 @@ void AnaSample::ResetPMTDataHist()
     }
 }
 
-void AnaSample::LoadPMTDataEntries()
+void AnaSample::LoadPMTDataEntries(int mode)
 {
     selTree->SetDataBranches();
 
@@ -260,17 +260,29 @@ void AnaSample::LoadPMTDataEntries()
         if ( nReflec < nReflec_min || nReflec > nReflec_max ) continue;
 	if ( nRaySct < nRaySct_min || nRaySct > nRaySct_max ) continue;
         if ( nMieSct < nMieSct_min || nMieSct > nMieSct_max ) continue;
-        if (m_scatter || m_scatter_map)
-        {
-            if (timetof>=m_scatter_time1 && timetof<m_scatter_time2) m_hdata_pmt->Fill(pmtID+0.5, nPE);
-            else if (timetof>=m_scatter_time2 && timetof<m_scatter_time3) m_hdata_pmt_control->Fill(pmtID+0.5, nPE);
+        if (!mode){
+          if (m_scatter || m_scatter_map)
+          {
+              if (timetof>=m_scatter_time1 && timetof<m_scatter_time2) m_hdata_pmt->Fill(pmtID+0.5, nPE);
+              else if (timetof>=m_scatter_time2 && timetof<m_scatter_time3) m_hdata_pmt_control->Fill(pmtID+0.5, nPE);
+          }
+          else m_hdata_pmt->Fill(pmtID+0.5, nPE);
         }
-        else m_hdata_pmt->Fill(pmtID+0.5, nPE);
+        if (mode){
+          std::cout << "Timetof : " << timetof << std::endl;
+          if (m_scatter || m_scatter_map)
+          {
+              if (timetof>=m_scatter_time1 && timetof<m_scatter_time2) m_hdata_pmt->Fill(pmtID+0.5, timetof);
+              else if (timetof>=m_scatter_time2 && timetof<m_scatter_time3) m_hdata_pmt_control->Fill(pmtID+0.5, timetof);
+          }
+          else m_hdata_pmt->Fill(pmtID+0.5, timetof);
+        }
     }
 }
 
-void AnaSample::LoadPMTDataHist()
+void AnaSample::LoadPMTDataHist(int mode)
 {
+    //acraplet: mode can be either 0 - p.e. fit or 1 - timing fit
     std::cout << TAG<<"Reading PMT hit histogram..."<<std::endl;
 
     TH2F* hist = selTree->GetDataHist();
@@ -307,20 +319,37 @@ void AnaSample::LoadPMTDataHist()
                     nPE += val*fac;
                 }
             }
+            if (!mode){
+	
+              if (m_template)
+              {
+                  m_htimetof_pmt_data->Fill(pmtID+0.5,timetof+m_timetof_offset,nPE);
+              }
 
-            if (m_template)
-            {
-                m_htimetof_pmt_data->Fill(pmtID+0.5,timetof+m_timetof_offset,nPE);
+              if ( timetof < t_min || timetof > t_max ) continue;
+
+              if (m_scatter || m_scatter_map)
+              {
+                  if (timetof>=m_scatter_time1 && timetof<m_scatter_time2) m_hdata_pmt->Fill(pmtID+0.5, nPE);
+                  else if (timetof>=m_scatter_time2 && timetof<m_scatter_time3) m_hdata_pmt_control->Fill(pmtID+0.5, nPE);
+              }
+              else m_hdata_pmt->Fill(pmtID+0.5, nPE);
             }
+            if (mode){
+              if (m_template)
+              {
+                  m_htimetof_pmt_data->Fill(pmtID+0.5,timetof+m_timetof_offset,nPE);
+              }
+    
+              if ( timetof < t_min || timetof > t_max ) continue;
 
-            if ( timetof < t_min || timetof > t_max ) continue;
-
-            if (m_scatter || m_scatter_map)
-            {
-                if (timetof>=m_scatter_time1 && timetof<m_scatter_time2) m_hdata_pmt->Fill(pmtID+0.5, nPE);
-                else if (timetof>=m_scatter_time2 && timetof<m_scatter_time3) m_hdata_pmt_control->Fill(pmtID+0.5, nPE);
+              if (m_scatter || m_scatter_map)
+              {
+                  if (timetof>=m_scatter_time1 && timetof<m_scatter_time2) m_hdata_pmt->Fill(pmtID+0.5, timetof+m_timetof_offset);
+                  else if (timetof>=m_scatter_time2 && timetof<m_scatter_time3) m_hdata_pmt_control->Fill(pmtID+0.5, timetof+m_timetof_offset);
+              }
+              else m_hdata_pmt->Fill(pmtID+0.5, timetof+m_timetof_offset);
             }
-            else m_hdata_pmt->Fill(pmtID+0.5, nPE);
         }
     }
 }
@@ -618,6 +647,8 @@ void AnaSample::FillDataHist(bool stat_fluc)
     for(auto& e : m_pmts)
     {
         const int pmtID = e.GetPMTID();
+        //acraplet
+        std::cout<< "PMT ID: "<<pmtID << "m_norm: " << m_norm <<std::endl; 
         double weight = m_hdata_pmt->GetBinContent(pmtID+1)*m_norm;
 
         if (stat_fluc)
